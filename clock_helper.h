@@ -1,6 +1,8 @@
 #pragma once
 #include "lvgl.h"
 
+#define CLOCK_VERSION "1.0"
+
 // ── 7-Segment rectangles with per-segment slide animation ────────────────────
 // bit0=A(top) bit1=B(top-R) bit2=C(bot-R) bit3=D(bot) bit4=E(bot-L)
 // bit5=F(top-L) bit6=G(mid)
@@ -57,6 +59,12 @@ inline void seg_init(int d,
 
 inline void colon_init(lv_obj_t* at, lv_obj_t* ab) {
     g_colon_act[0]=at; g_colon_act[1]=ab;
+}
+
+inline void colon_set(bool visible) {
+    lv_opa_t opa = visible ? LV_OPA_COVER : LV_OPA_TRANSP;
+    for (int i = 0; i < 2; i++)
+        lv_obj_set_style_opa(g_colon_act[i], opa, LV_PART_MAIN);
 }
 
 // ── Boot guard flag — true until NTP sync ────────────────────────────────────

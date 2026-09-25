@@ -80,7 +80,7 @@ esphome:
                   id(sec_bar_bg), id(sec_bar_fg),
                   id(sec_arc), id(lbl_sec_digits));
                 lv_arc_set_value(id(sec_arc), 0);
-                lv_label_set_text(id(lbl_date), "Connecting...");
+                lv_label_set_text(id(lbl_date), "v" CLOCK_VERSION "  —  Connecting...");
                 g_boot_pulsing = true;
                 lv_refr_now(NULL);
 
@@ -255,6 +255,7 @@ interval:
               lv_label_set_text(id(lbl_date), "No WiFi  -  Visit 1.2.3.4");
             // Boot animation — only after on_boot has set g_boot_pulsing = true
             if (g_boot_pulsing) {
+              lv_obj_invalidate(id(clock_screen));
               id(g_boot_sec) = (id(g_boot_sec) + 1) % 60;
               {
                 char bsec[3];
@@ -262,11 +263,7 @@ interval:
                 lv_label_set_text(id(lbl_sec_digits), bsec);
               }
               lv_arc_set_value(id(sec_arc), id(g_boot_sec));
-              bool cb = (id(g_boot_sec) % 2 == 0);
-              for (int i = 0; i < 2; i++) {
-                if (cb) lv_obj_clear_flag(g_colon_act[i], LV_OBJ_FLAG_HIDDEN);
-                else    lv_obj_add_flag(g_colon_act[i], LV_OBJ_FLAG_HIDDEN);
-              }
+              colon_set(id(g_boot_sec) % 2 == 0);
             }
             return;
           }
@@ -291,22 +288,18 @@ interval:
             lv_obj_set_style_opa(id(lbl_toast), LV_OPA_TRANSP, LV_PART_MAIN);
           }
 
+          // Full-screen invalidation each tick — forces LVGL to repaint
+          // from a clean slate, eliminating all AA dirty-region ghost pixels.
+          lv_obj_invalidate(id(clock_screen));
+
           int disp_h = g_use_24h ? h : (h % 12 == 0 ? 12 : h % 12);
-          int h12 = disp_h;  // name kept for segment code below
+          int h12 = disp_h;
           seg_set(0, h12 / 10, true);
           seg_set(1, h12 % 10, true);
           seg_set(2, m  / 10,  true);
           seg_set(3, m  % 10,  true);
 
-          // Colon blink via HIDDEN flag — proper parent area invalidation,
-          // no color-blending artifacts on round dots.
-          {
-            bool colon_bright = (s % 2 == 0);
-            for (int i = 0; i < 2; i++) {
-              if (colon_bright) lv_obj_clear_flag(g_colon_act[i], LV_OBJ_FLAG_HIDDEN);
-              else              lv_obj_add_flag(g_colon_act[i], LV_OBJ_FLAG_HIDDEN);
-            }
-          }
+          colon_set(s % 2 == 0);
 
           // Seconds: label + arc ring (label has transparent bg, so arc AA
           // pixels always blend against static background — no smearing).
