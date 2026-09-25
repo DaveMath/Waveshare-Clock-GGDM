@@ -68,25 +68,20 @@ esphome:
                 seg_init(3,
                   id(s_m1_a),id(s_m1_b),id(s_m1_c),id(s_m1_d),id(s_m1_e),id(s_m1_f),id(s_m1_g),
                   id(g_m1_a),id(g_m1_b),id(g_m1_c),id(g_m1_d),id(g_m1_e),id(g_m1_f),id(g_m1_g));
-                seg_init(4,
-                  id(s_s0_a),id(s_s0_b),id(s_s0_c),id(s_s0_d),id(s_s0_e),id(s_s0_f),id(s_s0_g),
-                  id(g_s0_a),id(g_s0_b),id(g_s0_c),id(g_s0_d),id(g_s0_e),id(g_s0_f),id(g_s0_g));
-                seg_init(5,
-                  id(s_s1_a),id(s_s1_b),id(s_s1_c),id(s_s1_d),id(s_s1_e),id(s_s1_f),id(s_s1_g),
-                  id(g_s1_a),id(g_s1_b),id(g_s1_c),id(g_s1_d),id(g_s1_e),id(g_s1_f),id(g_s1_g));
-                colon_init(id(col_a), id(col_b), id(col_ga), id(col_gb));
-                seg_set(0, 0, false);
+                colon_init(id(col_a), id(col_b));
+                seg_set(0, 1, false);
                 seg_set(1, 2, false);
-                seg_set(2, 0, false);
-                seg_set(3, 0, false);
-                seg_set_sm(4, 0, false);
-                seg_set_sm(5, 0, false);
+                seg_set(2, 3, false);
+                seg_set(3, 4, false);
+                lv_label_set_text(id(lbl_sec_digits), "00");
                 apply_current_theme(
                   id(clock_screen), id(date_header),
                   id(lbl_date), id(lbl_ampm),
                   id(sec_bar_bg), id(sec_bar_fg),
-                  id(sec_arc));
-                lv_arc_set_value(id(sec_arc), 30);
+                  id(sec_arc), id(lbl_sec_digits));
+                lv_arc_set_value(id(sec_arc), 0);
+                lv_label_set_text(id(lbl_date), "Connecting...");
+                g_boot_pulsing = true;
                 lv_refr_now(NULL);
 
 esp32:
@@ -113,6 +108,9 @@ globals:
   - id: g_toast_ms
     type: uint32_t
     initial_value: '0'
+  - id: g_boot_sec
+    type: uint8_t
+    initial_value: '0'
 
 api:
   encryption:
@@ -127,6 +125,14 @@ wifi:
     ssid: "WaveShare-Clock"
     password: ""
   reboot_timeout: 0s
+  on_connect:
+    - lambda: |-
+        if (!g_provisioning)
+          lv_label_set_text(id(lbl_date), "Syncing time...");
+  on_disconnect:
+    - lambda: |-
+        if (!g_provisioning && id(clock_time).now().is_valid())
+          lv_label_set_text(id(lbl_date), "Reconnecting...");
 
 time:
   - platform: sntp
@@ -211,7 +217,7 @@ interval:
             id(clock_screen), id(date_header),
             id(lbl_date), id(lbl_ampm),
             id(sec_bar_bg), id(sec_bar_fg),
-            id(sec_arc));
+            id(sec_arc), id(lbl_sec_digits));
           id(g_btn_cycles_done) = id(g_btn_cycles_done) + 1;
 
   - interval: 1s
@@ -237,18 +243,34 @@ interval:
               id(clock_screen), id(date_header),
               id(lbl_date), id(lbl_ampm),
               id(sec_bar_bg), id(sec_bar_fg),
-              id(sec_arc));
+              id(sec_arc), id(lbl_sec_digits));
           }
 
           auto t = id(clock_time).now();
           static uint32_t s_sync_err_start = 0;
           if (!t.is_valid()) {
             if (!s_sync_err_start) s_sync_err_start = millis();
-            if (millis() - s_sync_err_start > 45000) {
-              lv_label_set_text(id(lbl_date), "NO WIFI - VISIT 1.2.3.4");
+            uint32_t elapsed = millis() - s_sync_err_start;
+            if (elapsed > 45000)
+              lv_label_set_text(id(lbl_date), "No WiFi  -  Visit 1.2.3.4");
+            // Boot animation — only after on_boot has set g_boot_pulsing = true
+            if (g_boot_pulsing) {
+              id(g_boot_sec) = (id(g_boot_sec) + 1) % 60;
+              {
+                char bsec[3];
+                snprintf(bsec, sizeof(bsec), "%02d", (int)id(g_boot_sec));
+                lv_label_set_text(id(lbl_sec_digits), bsec);
+              }
+              lv_arc_set_value(id(sec_arc), id(g_boot_sec));
+              bool cb = (id(g_boot_sec) % 2 == 0);
+              for (int i = 0; i < 2; i++) {
+                if (cb) lv_obj_clear_flag(g_colon_act[i], LV_OBJ_FLAG_HIDDEN);
+                else    lv_obj_add_flag(g_colon_act[i], LV_OBJ_FLAG_HIDDEN);
+              }
             }
             return;
           }
+          g_boot_pulsing = false;
           s_sync_err_start = 0;
           int h = t.hour, m = t.minute, s = t.second;
 
@@ -260,7 +282,7 @@ interval:
               id(clock_screen), id(date_header),
               id(lbl_date), id(lbl_ampm),
               id(sec_bar_bg), id(sec_bar_fg),
-              id(sec_arc));
+              id(sec_arc), id(lbl_sec_digits));
           }
 
           // Hide toast after 2.5 s
@@ -276,22 +298,31 @@ interval:
           seg_set(2, m  / 10,  true);
           seg_set(3, m  % 10,  true);
 
-          // Colon blink: toggle opacity so the arc of the circle isn't re-blended
-          // each second (bg_color change on radius-6 circles caused smearing).
-          bool colon_bright = (s % 2 == 0);
-          for (int i = 0; i < 2; i++) {
-            lv_obj_set_style_opa(g_colon_act[i],
-              colon_bright ? LV_OPA_COVER : LV_OPA_TRANSP, LV_PART_MAIN);
+          // Colon blink via HIDDEN flag — proper parent area invalidation,
+          // no color-blending artifacts on round dots.
+          {
+            bool colon_bright = (s % 2 == 0);
+            for (int i = 0; i < 2; i++) {
+              if (colon_bright) lv_obj_clear_flag(g_colon_act[i], LV_OBJ_FLAG_HIDDEN);
+              else              lv_obj_add_flag(g_colon_act[i], LV_OBJ_FLAG_HIDDEN);
+            }
           }
 
-          // Seconds arc + animated segment digits
+          // Seconds: label + arc ring (label has transparent bg, so arc AA
+          // pixels always blend against static background — no smearing).
           lv_arc_set_value(id(sec_arc), s);
-          seg_set_sm(4, s / 10, true);
-          seg_set_sm(5, s % 10, true);
+          {
+            char ssec[3];
+            snprintf(ssec, sizeof(ssec), "%02d", s);
+            lv_label_set_text(id(lbl_sec_digits), ssec);
+          }
 
-          // AM/PM (hidden in 24h mode)
-          if (g_use_24h) lv_label_set_text(id(lbl_ampm), "");
-          else lv_label_set_text(id(lbl_ampm), h < 12 ? "AM" : "PM");
+          // AM/PM — update only on change to avoid a needless per-second repaint
+          {
+            const char* ap = g_use_24h ? "" : (h < 12 ? "AM" : "PM");
+            if (strcmp(lv_label_get_text(id(lbl_ampm)), ap) != 0)
+              lv_label_set_text(id(lbl_ampm), ap);
+          }
 
           // Full spelled-out date
           char db[40];
@@ -561,28 +592,6 @@ lvgl:
                   border_width: 0
                   radius: 1
 
-              # ── Ghost colon dots ──────────────────────────────────────────
-              - obj:
-                  id: col_ga
-                  x: 120
-                  y: 55
-                  width: 12
-                  height: 12
-                  bg_color: 0xE3DDD4
-                  bg_opa: 100%
-                  border_width: 0
-                  radius: 6
-              - obj:
-                  id: col_gb
-                  x: 120
-                  y: 98
-                  width: 12
-                  height: 12
-                  bg_color: 0xE3DDD4
-                  bg_opa: 100%
-                  border_width: 0
-                  radius: 6
-
               # ── M0 ghosts (bx=136, by=30) ────────────────────────────────
               - obj:
                   id: g_m0_a
@@ -726,150 +735,6 @@ lvgl:
                   bg_opa: 100%
                   border_width: 0
                   radius: 1
-
-              # ── S0 ghosts (bx=260, by=60) — tens of seconds, inside arc ──
-              - obj:
-                  id: g_s0_a
-                  x: 262
-                  y: 60
-                  width: 17
-                  height: 2
-                  bg_color: 0xE3DDD4
-                  bg_opa: 100%
-                  border_width: 0
-                  radius: 0
-              - obj:
-                  id: g_s0_f
-                  x: 260
-                  y: 62
-                  width: 2
-                  height: 18
-                  bg_color: 0xE3DDD4
-                  bg_opa: 100%
-                  border_width: 0
-                  radius: 0
-              - obj:
-                  id: g_s0_b
-                  x: 279
-                  y: 62
-                  width: 2
-                  height: 18
-                  bg_color: 0xE3DDD4
-                  bg_opa: 100%
-                  border_width: 0
-                  radius: 0
-              - obj:
-                  id: g_s0_g
-                  x: 262
-                  y: 80
-                  width: 17
-                  height: 2
-                  bg_color: 0xE3DDD4
-                  bg_opa: 100%
-                  border_width: 0
-                  radius: 0
-              - obj:
-                  id: g_s0_e
-                  x: 260
-                  y: 82
-                  width: 2
-                  height: 18
-                  bg_color: 0xE3DDD4
-                  bg_opa: 100%
-                  border_width: 0
-                  radius: 0
-              - obj:
-                  id: g_s0_c
-                  x: 279
-                  y: 82
-                  width: 2
-                  height: 18
-                  bg_color: 0xE3DDD4
-                  bg_opa: 100%
-                  border_width: 0
-                  radius: 0
-              - obj:
-                  id: g_s0_d
-                  x: 262
-                  y: 100
-                  width: 17
-                  height: 2
-                  bg_color: 0xE3DDD4
-                  bg_opa: 100%
-                  border_width: 0
-                  radius: 0
-
-              # ── S1 ghosts (bx=283, by=60) — units of seconds, inside arc ─
-              - obj:
-                  id: g_s1_a
-                  x: 285
-                  y: 60
-                  width: 17
-                  height: 2
-                  bg_color: 0xE3DDD4
-                  bg_opa: 100%
-                  border_width: 0
-                  radius: 0
-              - obj:
-                  id: g_s1_f
-                  x: 283
-                  y: 62
-                  width: 2
-                  height: 18
-                  bg_color: 0xE3DDD4
-                  bg_opa: 100%
-                  border_width: 0
-                  radius: 0
-              - obj:
-                  id: g_s1_b
-                  x: 302
-                  y: 62
-                  width: 2
-                  height: 18
-                  bg_color: 0xE3DDD4
-                  bg_opa: 100%
-                  border_width: 0
-                  radius: 0
-              - obj:
-                  id: g_s1_g
-                  x: 285
-                  y: 80
-                  width: 17
-                  height: 2
-                  bg_color: 0xE3DDD4
-                  bg_opa: 100%
-                  border_width: 0
-                  radius: 0
-              - obj:
-                  id: g_s1_e
-                  x: 283
-                  y: 82
-                  width: 2
-                  height: 18
-                  bg_color: 0xE3DDD4
-                  bg_opa: 100%
-                  border_width: 0
-                  radius: 0
-              - obj:
-                  id: g_s1_c
-                  x: 302
-                  y: 82
-                  width: 2
-                  height: 18
-                  bg_color: 0xE3DDD4
-                  bg_opa: 100%
-                  border_width: 0
-                  radius: 0
-              - obj:
-                  id: g_s1_d
-                  x: 285
-                  y: 100
-                  width: 17
-                  height: 2
-                  bg_color: 0xE3DDD4
-                  bg_opa: 100%
-                  border_width: 0
-                  radius: 0
 
               # ══════════════════════════════════════════════════════════════
               #  ACTIVE SEGMENTS  (bright, animated; start at 0 width/height)
@@ -1029,7 +894,7 @@ lvgl:
                   bg_color: 0x2E5499
                   bg_opa: 100%
                   border_width: 0
-                  radius: 6
+                  radius: 0
               - obj:
                   id: col_b
                   x: 120
@@ -1039,7 +904,7 @@ lvgl:
                   bg_color: 0x2E5499
                   bg_opa: 100%
                   border_width: 0
-                  radius: 6
+                  radius: 0
 
               # ── M0 active (bx=136, by=30) ────────────────────────────────
               - obj:
@@ -1185,152 +1050,21 @@ lvgl:
                   border_width: 0
                   radius: 1
 
-              # ── S0 active (bx=260, by=60) ─────────────────────────────────
-              - obj:
-                  id: s_s0_a
+              # ── Seconds digits label (DSEG7, transparent bg so arc ring AA ──
+              # ── pixels always blend against static background — no smearing) ─
+              - label:
+                  id: lbl_sec_digits
+                  text: "00"
+                  text_font: font_seg_sm
                   x: 262
-                  y: 60
-                  width: 1
-                  height: 2
-                  bg_color: 0x152E6E
-                  bg_opa: 100%
-                  border_width: 0
-                  radius: 0
-              - obj:
-                  id: s_s0_f
-                  x: 260
-                  y: 62
-                  width: 2
-                  height: 1
-                  bg_color: 0x152E6E
-                  bg_opa: 100%
-                  border_width: 0
-                  radius: 0
-              - obj:
-                  id: s_s0_b
-                  x: 279
-                  y: 62
-                  width: 2
-                  height: 1
-                  bg_color: 0x152E6E
-                  bg_opa: 100%
-                  border_width: 0
-                  radius: 0
-              - obj:
-                  id: s_s0_g
-                  x: 262
-                  y: 80
-                  width: 1
-                  height: 2
-                  bg_color: 0x152E6E
-                  bg_opa: 100%
-                  border_width: 0
-                  radius: 0
-              - obj:
-                  id: s_s0_e
-                  x: 260
-                  y: 82
-                  width: 2
-                  height: 1
-                  bg_color: 0x152E6E
-                  bg_opa: 100%
-                  border_width: 0
-                  radius: 0
-              - obj:
-                  id: s_s0_c
-                  x: 279
-                  y: 82
-                  width: 2
-                  height: 1
-                  bg_color: 0x152E6E
-                  bg_opa: 100%
-                  border_width: 0
-                  radius: 0
-              - obj:
-                  id: s_s0_d
-                  x: 262
-                  y: 100
-                  width: 1
-                  height: 2
-                  bg_color: 0x152E6E
-                  bg_opa: 100%
-                  border_width: 0
-                  radius: 0
-
-              # ── S1 active (bx=283, by=60) ─────────────────────────────────
-              - obj:
-                  id: s_s1_a
-                  x: 285
-                  y: 60
-                  width: 1
-                  height: 2
-                  bg_color: 0x152E6E
-                  bg_opa: 100%
-                  border_width: 0
-                  radius: 0
-              - obj:
-                  id: s_s1_f
-                  x: 283
-                  y: 62
-                  width: 2
-                  height: 1
-                  bg_color: 0x152E6E
-                  bg_opa: 100%
-                  border_width: 0
-                  radius: 0
-              - obj:
-                  id: s_s1_b
-                  x: 302
-                  y: 62
-                  width: 2
-                  height: 1
-                  bg_color: 0x152E6E
-                  bg_opa: 100%
-                  border_width: 0
-                  radius: 0
-              - obj:
-                  id: s_s1_g
-                  x: 285
-                  y: 80
-                  width: 1
-                  height: 2
-                  bg_color: 0x152E6E
-                  bg_opa: 100%
-                  border_width: 0
-                  radius: 0
-              - obj:
-                  id: s_s1_e
-                  x: 283
-                  y: 82
-                  width: 2
-                  height: 1
-                  bg_color: 0x152E6E
-                  bg_opa: 100%
-                  border_width: 0
-                  radius: 0
-              - obj:
-                  id: s_s1_c
-                  x: 302
-                  y: 82
-                  width: 2
-                  height: 1
-                  bg_color: 0x152E6E
-                  bg_opa: 100%
-                  border_width: 0
-                  radius: 0
-              - obj:
-                  id: s_s1_d
-                  x: 285
-                  y: 100
-                  width: 1
-                  height: 2
-                  bg_color: 0x152E6E
-                  bg_opa: 100%
-                  border_width: 0
-                  radius: 0
+                  y: 67
+                  text_color: 0x152E6E
+                  bg_opa: 0%
 
               # ══════════════════════════════════════════════════════════════
-              #  ARC GAUGE  (seconds, x=253 y=52, 58×58)
+              #  ARC GAUGE  (seconds, x=253 y=52, 58×58) — highest z-order:
+              #  ring draws LAST so it composites over the static-background
+              #  label area; AA pixels blend against bg_color, never text.
               # ══════════════════════════════════════════════════════════════
               - arc:
                   id: sec_arc
@@ -1338,6 +1072,7 @@ lvgl:
                   y: 52
                   width: 58
                   height: 58
+                  pad_all: 3
                   min_value: 0
                   max_value: 59
                   value: 0

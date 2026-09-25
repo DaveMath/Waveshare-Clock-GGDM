@@ -21,14 +21,12 @@ static const uint8_t SEG_MAP[10] = {
 };
 
 static const int  SEG_FULL[7]    = {42, 44, 44, 42, 44, 44, 42};
-static const int  SEG_FULL_SM[7] = {17, 18, 18, 17, 18, 18, 17}; // ~40% scale for seconds-arc digits
 static const bool SEG_IS_H[7]    = {true,false,false,true,false,false,true};
 
 struct SegDigit { lv_obj_t* s[7]; int8_t val; };
 static SegDigit  g_digs[6];
 static lv_obj_t* g_ghost[6][7];
 static lv_obj_t* g_colon_act[2];
-static lv_obj_t* g_colon_gst[2];
 
 // ── init ─────────────────────────────────────────────────────────────────────
 
@@ -44,27 +42,74 @@ inline void seg_init(int d,
     g_ghost[d][4]=ge; g_ghost[d][5]=gf; g_ghost[d][6]=gg;
     g_digs[d].val = -1;
     for (int i = 0; i < 7; i++) {
-        if (SEG_IS_H[i]) lv_obj_set_width (g_digs[d].s[i], 0);
-        else              lv_obj_set_height(g_digs[d].s[i], 0);
+        lv_obj_t* obj = g_digs[d].s[i];
+        if (SEG_IS_H[i]) {
+            // Store right_x = orig_x + full_width so _sa_h can keep it fixed.
+            lv_coord_t rx = (lv_coord_t)lv_obj_get_x(obj) + (lv_coord_t)SEG_FULL[i];
+            lv_obj_set_user_data(obj, (void*)(intptr_t)rx);
+            lv_obj_set_x(obj, rx);   // park at right edge with zero width
+            lv_obj_set_width(obj, 0);
+        } else {
+            lv_obj_set_height(obj, 0);
+        }
     }
 }
 
-inline void colon_init(lv_obj_t* at, lv_obj_t* ab, lv_obj_t* gt, lv_obj_t* gb_) {
+inline void colon_init(lv_obj_t* at, lv_obj_t* ab) {
     g_colon_act[0]=at; g_colon_act[1]=ab;
-    g_colon_gst[0]=gt; g_colon_gst[1]=gb_;
 }
 
-// ── animation ─────────────────────────────────────────────────────────────────
+// ── Boot guard flag — true until NTP sync ────────────────────────────────────
+static bool g_boot_pulsing = false;
 
-static void _anim_seg(lv_obj_t* obj, int from, int to, bool is_h) {
+// ── animation ─────────────────────────────────────────────────────────────────
+//
+// Horizontal segments (A, D, G) are RIGHT-EDGE anchored:
+//   right_x = orig_x + full_width  (stored in user_data at seg_init)
+//   animated:  x = right_x - v,  width = v
+// Effect: segments grow from the B/C side (right) leftward, and retract
+// back toward B/C.  This matches how digits morph into their neighbours —
+// the segments that connect to the right-side verticals (which are almost
+// always present) emerge from and absorb into that junction.
+//
+// Vertical segments (B, C, E, F) remain TOP-anchored (y fixed, height varies).
+// They already grow down from the A/G junctions, which is correct.
+
+static void _sa_h(void* obj, int32_t v) {
+    lv_obj_t* o = (lv_obj_t*)obj;
+    lv_coord_t rx = (lv_coord_t)(intptr_t)lv_obj_get_user_data(o);
+    lv_obj_set_x(o, rx - v);
+    lv_obj_set_width(o, v);
+}
+
+static void _run_anim(lv_obj_t* obj, lv_coord_t from, lv_coord_t to, bool is_h) {
     lv_anim_t a; lv_anim_init(&a);
     lv_anim_set_var(&a, obj);
-    lv_anim_set_exec_cb(&a, is_h ? (lv_anim_exec_xcb_t)lv_obj_set_width
-                                  : (lv_anim_exec_xcb_t)lv_obj_set_height);
+    lv_anim_set_exec_cb(&a, is_h ? _sa_h : (lv_anim_exec_xcb_t)lv_obj_set_height);
     lv_anim_set_values(&a, from, to);
     lv_anim_set_time(&a, ANIM_SEG_MS);
     lv_anim_set_path_cb(&a, to > from ? lv_anim_path_ease_out : lv_anim_path_ease_in);
     lv_anim_start(&a);
+}
+
+// Snap helpers — set position correctly for the right-anchor scheme
+static inline void _seg_show(lv_obj_t* obj, int full, bool is_h) {
+    if (is_h) {
+        lv_coord_t rx = (lv_coord_t)(intptr_t)lv_obj_get_user_data(obj);
+        lv_obj_set_x(obj, rx - full);
+        lv_obj_set_width(obj, full);
+    } else {
+        lv_obj_set_height(obj, full);
+    }
+}
+static inline void _seg_hide(lv_obj_t* obj, int full, bool is_h) {
+    if (is_h) {
+        lv_coord_t rx = (lv_coord_t)(intptr_t)lv_obj_get_user_data(obj);
+        lv_obj_set_x(obj, rx);
+        lv_obj_set_width(obj, 0);
+    } else {
+        lv_obj_set_height(obj, 0);
+    }
 }
 
 inline void seg_set(int d, int v, bool anim) {
@@ -74,36 +119,21 @@ inline void seg_set(int d, int v, bool anim) {
     uint8_t om = (dig.val >= 0) ? SEG_MAP[dig.val] : 0;
     for (int i = 0; i < 7; i++) {
         bool was=(om>>i)&1, now=(nm>>i)&1;
-        lv_obj_t* obj = dig.s[i]; int full = SEG_FULL[i];
+        lv_obj_t* obj = dig.s[i]; int full = SEG_FULL[i]; bool is_h = SEG_IS_H[i];
         if (now && !was) {
-            if (anim) _anim_seg(obj, 0, full, SEG_IS_H[i]);
-            else { if (SEG_IS_H[i]) lv_obj_set_width(obj,full); else lv_obj_set_height(obj,full); }
+            if (anim) {
+                lv_coord_t cur = is_h ? lv_obj_get_width(obj) : lv_obj_get_height(obj);
+                lv_anim_del(obj, NULL);
+                _run_anim(obj, cur, full, is_h);
+            } else { _seg_show(obj, full, is_h); }
         } else if (!now && was) {
-            if (anim) _anim_seg(obj, full, 0, SEG_IS_H[i]);
-            else { if (SEG_IS_H[i]) lv_obj_set_width(obj,0); else lv_obj_set_height(obj,0); }
+            if (anim) {
+                lv_coord_t cur = is_h ? lv_obj_get_width(obj) : lv_obj_get_height(obj);
+                lv_anim_del(obj, NULL);
+                _run_anim(obj, cur, 0, is_h);
+            } else { _seg_hide(obj, full, is_h); }
         } else if (now) {
-            if (SEG_IS_H[i]) lv_obj_set_width(obj,full); else lv_obj_set_height(obj,full);
-        }
-    }
-    dig.val = v;
-}
-
-inline void seg_set_sm(int d, int v, bool anim) {
-    SegDigit& dig = g_digs[d];
-    if (dig.val == v) return;
-    uint8_t nm = SEG_MAP[v];
-    uint8_t om = (dig.val >= 0) ? SEG_MAP[dig.val] : 0;
-    for (int i = 0; i < 7; i++) {
-        bool was=(om>>i)&1, now=(nm>>i)&1;
-        lv_obj_t* obj = dig.s[i]; int full = SEG_FULL_SM[i];
-        if (now && !was) {
-            if (anim) _anim_seg(obj, 0, full, SEG_IS_H[i]);
-            else { if (SEG_IS_H[i]) lv_obj_set_width(obj,full); else lv_obj_set_height(obj,full); }
-        } else if (!now && was) {
-            if (anim) _anim_seg(obj, full, 0, SEG_IS_H[i]);
-            else { if (SEG_IS_H[i]) lv_obj_set_width(obj,0); else lv_obj_set_height(obj,0); }
-        } else if (now) {
-            if (SEG_IS_H[i]) lv_obj_set_width(obj,full); else lv_obj_set_height(obj,full);
+            _seg_show(obj, full, is_h);
         }
     }
     dig.val = v;
@@ -254,25 +284,24 @@ inline void apply_theme(const ClockTheme& t,
     lv_obj_t* scr, lv_obj_t* hdr,
     lv_obj_t* lbl_date, lv_obj_t* lbl_ampm,
     lv_obj_t* bar_bg_o, lv_obj_t* bar_fg_o,
-    lv_obj_t* sec_arc)
+    lv_obj_t* sec_arc, lv_obj_t* lbl_sec_dig)
 {
-    lv_obj_set_style_bg_color(scr,           t.bg,        LV_PART_MAIN);
-    lv_obj_set_style_bg_color(hdr,           t.header_bg, LV_PART_MAIN);
-    lv_obj_set_style_text_color(lbl_date,    t.date_c,    LV_PART_MAIN);
-    lv_obj_set_style_text_color(lbl_ampm,    t.secondary, LV_PART_MAIN);
-    lv_obj_set_style_bg_color(bar_bg_o,      t.bar_bg,    LV_PART_MAIN);
-    lv_obj_set_style_bg_color(bar_fg_o,      t.bar_fg,    LV_PART_MAIN);
-    lv_obj_set_style_arc_color(sec_arc,      t.arc_bg_c,  LV_PART_MAIN);
-    lv_obj_set_style_arc_color(sec_arc,      t.arc_fg_c,  LV_PART_INDICATOR);
-    for (int d = 0; d < 6; d++)
+    lv_obj_set_style_bg_color(scr,              t.bg,        LV_PART_MAIN);
+    lv_obj_set_style_bg_color(hdr,              t.header_bg, LV_PART_MAIN);
+    lv_obj_set_style_text_color(lbl_date,       t.date_c,    LV_PART_MAIN);
+    lv_obj_set_style_text_color(lbl_ampm,       t.secondary, LV_PART_MAIN);
+    lv_obj_set_style_text_color(lbl_sec_dig,    t.digit,     LV_PART_MAIN);
+    lv_obj_set_style_bg_color(bar_bg_o,         t.bar_bg,    LV_PART_MAIN);
+    lv_obj_set_style_bg_color(bar_fg_o,         t.bar_fg,    LV_PART_MAIN);
+    lv_obj_set_style_arc_color(sec_arc,         t.arc_bg_c,  LV_PART_MAIN);
+    lv_obj_set_style_arc_color(sec_arc,         t.arc_fg_c,  LV_PART_INDICATOR);
+    for (int d = 0; d < 4; d++)  // H0 H1 M0 M1 only — seconds use lbl_sec_dig
         for (int i = 0; i < 7; i++) {
             lv_obj_set_style_bg_color(g_digs[d].s[i],  t.digit, LV_PART_MAIN);
             lv_obj_set_style_bg_color(g_ghost[d][i],   t.ghost, LV_PART_MAIN);
         }
-    for (int i = 0; i < 2; i++) {
+    for (int i = 0; i < 2; i++)
         lv_obj_set_style_bg_color(g_colon_act[i], t.colon_c, LV_PART_MAIN);
-        lv_obj_set_style_bg_color(g_colon_gst[i], t.ghost,   LV_PART_MAIN);
-    }
 }
 
 // Convenience: apply the current theme pair (day or night side)
@@ -280,11 +309,11 @@ inline void apply_current_theme(
     lv_obj_t* scr, lv_obj_t* hdr,
     lv_obj_t* lbl_date, lv_obj_t* lbl_ampm,
     lv_obj_t* bar_bg_o, lv_obj_t* bar_fg_o,
-    lv_obj_t* sec_arc)
+    lv_obj_t* sec_arc, lv_obj_t* lbl_sec_dig)
 {
     const ClockTheme& t = g_is_day ? THEME_PAIRS[g_theme_idx]->day
                                    : THEME_PAIRS[g_theme_idx]->night;
-    apply_theme(t, scr, hdr, lbl_date, lbl_ampm, bar_bg_o, bar_fg_o, sec_arc);
+    apply_theme(t, scr, hdr, lbl_date, lbl_ampm, bar_bg_o, bar_fg_o, sec_arc, lbl_sec_dig);
 }
 
 // Cycle to next theme, returns name of new theme
