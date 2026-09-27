@@ -80,7 +80,7 @@ esphome:
                   id(sec_bar_bg), id(sec_bar_fg),
                   id(sec_arc), id(lbl_sec_digits));
                 lv_arc_set_value(id(sec_arc), 0);
-                lv_label_set_text(id(lbl_date), "v" CLOCK_VERSION "  —  Connecting...");
+                lv_label_set_text(id(lbl_date), "v" CLOCK_VERSION "  -  Connecting...");
                 g_boot_pulsing = true;
                 lv_refr_now(NULL);
 
