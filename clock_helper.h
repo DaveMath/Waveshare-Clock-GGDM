@@ -9,7 +9,12 @@
 
 #define ANIM_SEG_MS 260
 
-static const uint8_t SEG_MAP[10] = {
+// Custom chars for boot animation (indices 10-12)
+#define SEG_CHAR_G  10   // G: A,C,D,E,F,G  — no top-right vertical (same shape as 6)
+#define SEG_CHAR_d  11   // d: B,C,D,E,G    — no top bar, no top-left vertical
+#define SEG_CHAR_H  12   // H: B,C,E,F,G    — both verticals + middle, no top/bottom
+
+static const uint8_t SEG_MAP[13] = {
     0b0111111,  // 0
     0b0000110,  // 1
     0b1011011,  // 2
@@ -20,6 +25,9 @@ static const uint8_t SEG_MAP[10] = {
     0b0000111,  // 7
     0b1111111,  // 8
     0b1101111,  // 9
+    0b1111101,  // 10 = G  (A,C,D,E,F,G — identical to 6)
+    0b1011110,  // 11 = d  (B,C,D,E,G)
+    0b1110110,  // 12 = H  (B,C,E,F,G)
 };
 
 static const int  SEG_FULL[7]    = {42, 44, 44, 42, 44, 44, 42};

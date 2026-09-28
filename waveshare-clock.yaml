@@ -69,10 +69,7 @@ esphome:
                   id(s_m1_a),id(s_m1_b),id(s_m1_c),id(s_m1_d),id(s_m1_e),id(s_m1_f),id(s_m1_g),
                   id(g_m1_a),id(g_m1_b),id(g_m1_c),id(g_m1_d),id(g_m1_e),id(g_m1_f),id(g_m1_g));
                 colon_init(id(col_a), id(col_b));
-                seg_set(0, 1, false);
-                seg_set(1, 2, false);
-                seg_set(2, 3, false);
-                seg_set(3, 4, false);
+                colon_set(false);   // boot animation drives colon from here
                 lv_label_set_text(id(lbl_sec_digits), "00");
                 apply_current_theme(
                   id(clock_screen), id(date_header),
@@ -251,17 +248,47 @@ interval:
             uint32_t elapsed = millis() - s_sync_err_start;
             if (elapsed > 45000)
               lv_label_set_text(id(lbl_date), "No WiFi  -  Visit 1.2.3.4");
-            // Boot animation — only after on_boot has set g_boot_pulsing = true
             if (g_boot_pulsing) {
               lv_obj_invalidate(id(clock_screen));
+              // Arc spins as a loading indicator throughout boot
               id(g_boot_sec) = (id(g_boot_sec) + 1) % 60;
-              {
-                char bsec[3];
-                snprintf(bsec, sizeof(bsec), "%02d", (int)id(g_boot_sec));
-                lv_label_set_text(id(lbl_sec_digits), bsec);
-              }
+              { char bs[3]; snprintf(bs,3,"%02d",(int)id(g_boot_sec));
+                lv_label_set_text(id(lbl_sec_digits),bs); }
               lv_arc_set_value(id(sec_arc), id(g_boot_sec));
-              colon_set(id(g_boot_sec) % 2 == 0);
+              // Choreographed digit sequence:
+              //  0  all-8 flash     4  00:00
+              //  1  GGdH brand      5  1→ :00   6  1→1:00   7  12: 00
+              //  2  colon on        8  12:1 0   9  12:20   10  12:30
+              //  3  colon blink    11  12:31  12  12:32   13  12:33   14  12:34
+              //  15+ loop from 4
+              static uint8_t s_bp = 0;
+              switch (s_bp) {
+                case 0:
+                  seg_set(0,8,false); seg_set(1,8,false);
+                  seg_set(2,8,false); seg_set(3,8,false);
+                  colon_set(false); s_bp++; break;
+                case 1:
+                  seg_set(0,SEG_CHAR_G,true); seg_set(1,SEG_CHAR_G,true);
+                  seg_set(2,SEG_CHAR_d,true); seg_set(3,SEG_CHAR_H,true);
+                  s_bp++; break;
+                case 2: colon_set(true);  s_bp++; break;
+                case 3: colon_set(false); s_bp++; break;
+                case 4:
+                  seg_set(0,0,true); seg_set(1,0,true);
+                  seg_set(2,0,true); seg_set(3,0,true);
+                  colon_set(true); s_bp++; break;
+                case 5:  seg_set(0,1,true); s_bp++; break;
+                case 6:  seg_set(1,1,true); s_bp++; break;
+                case 7:  seg_set(1,2,true); s_bp++; break;
+                case 8:  seg_set(2,1,true); s_bp++; break;
+                case 9:  seg_set(2,2,true); s_bp++; break;
+                case 10: seg_set(2,3,true); s_bp++; break;
+                case 11: seg_set(3,1,true); s_bp++; break;
+                case 12: seg_set(3,2,true); s_bp++; break;
+                case 13: seg_set(3,3,true); s_bp++; break;
+                case 14: seg_set(3,4,true); s_bp++; break;
+                default: s_bp = 4; break;
+              }
             }
             return;
           }
