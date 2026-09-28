@@ -24,7 +24,7 @@
 #define PROV_AP_SSID "WaveShare-Clock"
 
 bool g_provisioning = false;
-int  g_settings_changed = 0;  // set by web handler; checked in interval lambda
+volatile int g_settings_changed = 0;  // set by web handler task; checked in main task
 
 // ── NVS helpers ───────────────────────────────────────────────────────────────
 
@@ -272,12 +272,8 @@ static esp_err_t h_save_wifi(httpd_req_t* req) {
     if (n <= 0) { httpd_resp_send_500(req); return ESP_FAIL; }
     std::string ssid=_json_str(body,"ssid");
     std::string pass=_json_str(body,"pass");
-    std::string tz  =_json_str(body,"tz");
-    // find tz_idx from tz string name
-    int tz_idx = 0;
-    for (int i=0; i<NUM_TZ; i++) {
-        if (tz == TZ_NAMES[i]) { tz_idx=i; break; }
-    }
+    int tz_idx = _json_int(body, "tz", 0);
+    if (tz_idx < 0 || tz_idx >= NUM_TZ) tz_idx = 0;
     httpd_resp_set_type(req, "application/json");
     if (ssid.empty()) {
         httpd_resp_sendstr(req, "{\"ok\":false,\"msg\":\"SSID required\"}");
@@ -335,16 +331,16 @@ static esp_err_t h_setup_page(httpd_req_t* req) {
   <input id="pass" type="password" placeholder="Leave blank for open networks">
   <h2>Timezone</h2>
   <select id="tz">
-    <option value="America/Los_Angeles">Pacific (PT)</option>
-    <option value="America/Denver">Mountain (MT)</option>
-    <option value="America/Chicago">Central (CT)</option>
-    <option value="America/New_York">Eastern (ET)</option>
-    <option value="America/Anchorage">Alaska (AKT)</option>
-    <option value="Pacific/Honolulu">Hawaii (HST)</option>
-    <option value="Europe/London">London (GMT/BST)</option>
-    <option value="Europe/Paris">Paris / Berlin (CET)</option>
-    <option value="Asia/Tokyo">Tokyo (JST)</option>
-    <option value="Australia/Sydney">Sydney (AEST)</option>
+    <option value="0">Pacific (PT)</option>
+    <option value="1">Mountain (MT)</option>
+    <option value="2">Central (CT)</option>
+    <option value="3">Eastern (ET)</option>
+    <option value="4">Alaska (AKT)</option>
+    <option value="5">Hawaii (HST)</option>
+    <option value="6">London (GMT/BST)</option>
+    <option value="7">Paris / Berlin (CET)</option>
+    <option value="8">Tokyo (JST)</option>
+    <option value="9">Sydney (AEST)</option>
   </select>
   <button class="btn save-btn" id="btn" onclick="save()">Save &amp; Connect</button>
   <div class="msg" id="msg"></div>
@@ -504,7 +500,7 @@ function saveWifi(){
     m.className='msg err'; m.textContent='&#10007; Please enter a network name.'; return;
   }
   fetch('/save',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({ssid,pass:document.getElementById('w_pass').value,tz:String(cur.tz)})})
+    body:JSON.stringify({ssid,pass:document.getElementById('w_pass').value,tz:cur.tz})})
     .then(r=>r.json()).then(j=>{
       const m=document.getElementById('wmsg');
       m.className='msg '+(j.ok?'ok':'err');
@@ -546,7 +542,7 @@ static void _start_httpd(bool captive) {
     httpd_config_t cfg = HTTPD_DEFAULT_CONFIG();
     cfg.server_port       = 80;
     cfg.max_uri_handlers  = 10;
-    cfg.uri_match_fn      = captive ? httpd_uri_match_wildcard : httpd_uri_match_wildcard;
+    cfg.uri_match_fn      = httpd_uri_match_wildcard;
     httpd_start(&prov_httpd, &cfg);
 
     httpd_uri_t r_root    = {"/",             HTTP_GET,  h_root,         NULL};

@@ -1,7 +1,7 @@
 #pragma once
 #include "lvgl.h"
 
-#define CLOCK_VERSION "1.0"
+#define CLOCK_VERSION "1.1"
 
 // ── 7-Segment rectangles with per-segment slide animation ────────────────────
 // bit0=A(top) bit1=B(top-R) bit2=C(bot-R) bit3=D(bot) bit4=E(bot-L)
@@ -26,8 +26,8 @@ static const int  SEG_FULL[7]    = {42, 44, 44, 42, 44, 44, 42};
 static const bool SEG_IS_H[7]    = {true,false,false,true,false,false,true};
 
 struct SegDigit { lv_obj_t* s[7]; int8_t val; };
-static SegDigit  g_digs[6];
-static lv_obj_t* g_ghost[6][7];
+static SegDigit  g_digs[4];
+static lv_obj_t* g_ghost[4][7];
 static lv_obj_t* g_colon_act[2];
 
 // ── init ─────────────────────────────────────────────────────────────────────

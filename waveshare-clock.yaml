@@ -80,7 +80,7 @@ esphome:
                   id(sec_bar_bg), id(sec_bar_fg),
                   id(sec_arc), id(lbl_sec_digits));
                 lv_arc_set_value(id(sec_arc), 0);
-                lv_label_set_text(id(lbl_date), "v" CLOCK_VERSION "  -  Connecting...");
+                lv_label_set_text(id(lbl_date), "v" CLOCK_VERSION "  connecting...");
                 g_boot_pulsing = true;
                 lv_refr_now(NULL);
 
@@ -320,14 +320,15 @@ interval:
           }
 
           // Full spelled-out date
-          char db[40];
+          char db[64];
           static const char* day_names[] = {
             "Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"};
           static const char* mon_names[] = {
             "January","February","March","April","May","June",
             "July","August","September","October","November","December"};
-          snprintf(db, sizeof(db), "%s, %s %d",
-            day_names[t.day_of_week-1], mon_names[t.month-1], t.day_of_month);
+          snprintf(db, sizeof(db), "%s, %s %d  -  %s",
+            day_names[t.day_of_week-1], mon_names[t.month-1], t.day_of_month,
+            TZ_LABELS[g_tz_idx]);
           lv_label_set_text(id(lbl_date), db);
 
           // Seconds bar
@@ -357,6 +358,9 @@ binary_sensor:
       - delayed_off: 30ms
     on_press:
       then:
+        - light.turn_on:
+            id: backlight
+            brightness: 100%
         - lambda: |-
             id(g_btn_press_ms) = millis();
             id(g_btn_cycles_done) = 0;
@@ -1134,191 +1138,6 @@ lvgl:
                   pad_bottom: 3
                   opa: 0%
 
-              # ── Theme picker modal (long press) ───────────────────────────
-              - obj:
-                  id: modal_theme
-                  x: 0
-                  y: 0
-                  width: 320
-                  height: 172
-                  bg_color: 0x020408
-                  bg_opa: 95%
-                  border_width: 0
-                  radius: 0
-                  pad_all: 0
-                  opa: 0%
-
-                  widgets:
-                    - label:
-                        text: "COLOR THEME"
-                        text_font: font_m
-                        align: TOP_MID
-                        y: 5
-                        text_color: 0x7EB0F0
-
-                    # Row 1
-                    - obj:
-                        id: thm_btn_0
-                        x: 8
-                        y: 26
-                        width: 96
-                        height: 54
-                        bg_color: 0xEDE8DB
-                        bg_opa: 100%
-                        border_width: 0
-                        border_color: 0xFFFFFF
-                        radius: 5
-                        pad_all: 0
-                        widgets:
-                          - label:
-                              text: "Primary"
-                              text_font: font_s
-                              align: CENTER
-                              text_color: 0x152E6E
-                    - obj:
-                        id: thm_btn_1
-                        x: 112
-                        y: 26
-                        width: 96
-                        height: 54
-                        bg_color: 0xFDE8F2
-                        bg_opa: 100%
-                        border_width: 0
-                        border_color: 0xFFFFFF
-                        radius: 5
-                        pad_all: 0
-                        widgets:
-                          - label:
-                              text: "Pastel"
-                              text_font: font_s
-                              align: CENTER
-                              text_color: 0xCC1270
-                    - obj:
-                        id: thm_btn_2
-                        x: 216
-                        y: 26
-                        width: 96
-                        height: 54
-                        bg_color: 0x050A05
-                        bg_opa: 100%
-                        border_width: 0
-                        border_color: 0xFFFFFF
-                        radius: 5
-                        pad_all: 0
-                        widgets:
-                          - label:
-                              text: "Neon"
-                              text_font: font_s
-                              align: CENTER
-                              text_color: 0x00FF41
-
-                    # Row 2
-                    - obj:
-                        id: thm_btn_3
-                        x: 8
-                        y: 88
-                        width: 96
-                        height: 54
-                        bg_color: 0xF4F4F4
-                        bg_opa: 100%
-                        border_width: 0
-                        border_color: 0xFFFFFF
-                        radius: 5
-                        pad_all: 0
-                        widgets:
-                          - label:
-                              text: "Neutral"
-                              text_font: font_s
-                              align: CENTER
-                              text_color: 0x181818
-                    - obj:
-                        id: thm_btn_4
-                        x: 112
-                        y: 88
-                        width: 96
-                        height: 54
-                        bg_color: 0xFFF6E8
-                        bg_opa: 100%
-                        border_width: 0
-                        border_color: 0xFFFFFF
-                        radius: 5
-                        pad_all: 0
-                        widgets:
-                          - label:
-                              text: "Warm"
-                              text_font: font_s
-                              align: CENTER
-                              text_color: 0xB84000
-                    - obj:
-                        id: thm_btn_5
-                        x: 216
-                        y: 88
-                        width: 96
-                        height: 54
-                        bg_color: 0xE0F0FC
-                        bg_opa: 100%
-                        border_width: 0
-                        border_color: 0xFFFFFF
-                        radius: 5
-                        pad_all: 0
-                        widgets:
-                          - label:
-                              text: "Cool"
-                              text_font: font_s
-                              align: CENTER
-                              text_color: 0x0060B0
-
-                    - label:
-                        text: "Long press to cycle"
-                        text_font: font_s
-                        align: BOTTOM_MID
-                        y: -5
-                        text_color: 0x3A5878
-
-              # ── Timezone picker modal (short press) ───────────────────────
-              - obj:
-                  id: modal_tz
-                  x: 0
-                  y: 0
-                  width: 320
-                  height: 172
-                  bg_color: 0x020408
-                  bg_opa: 95%
-                  border_width: 0
-                  radius: 0
-                  pad_all: 0
-                  opa: 0%
-
-                  widgets:
-                    - label:
-                        text: "TIMEZONE"
-                        text_font: font_m
-                        align: TOP_MID
-                        y: 8
-                        text_color: 0x7EB0F0
-
-                    - label:
-                        id: lbl_modal_tz_name
-                        text: "Pacific (PT)"
-                        text_font: font_m
-                        align: CENTER
-                        y: -14
-                        text_color: 0xFFFFFF
-
-                    - label:
-                        id: lbl_modal_tz_pos
-                        text: "1 / 10"
-                        text_font: font_s
-                        align: CENTER
-                        y: 6
-                        text_color: 0x5080A0
-
-                    - label:
-                        text: "Short press to cycle"
-                        text_font: font_s
-                        align: BOTTOM_MID
-                        y: -5
-                        text_color: 0x3A5878
 
     # ══════════════════════════════════════════════════════════════════════════
     #  SETUP PAGE  –  shown on first boot when no WiFi credentials are stored
