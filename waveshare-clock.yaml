@@ -15,7 +15,7 @@
 #
 #  Digit origins (bx): H0=4  H1=62  |colon=118-134|  M0=136  M1=194
 #  Colon dots: x=120, top-dot y=55, bot-dot y=100, size 12×12, radius 6
-#  Arc: x=253 y=52, 58×58, centre=(282,81)
+#  Arc: x=258 y=52, 58×58, centre=(287,81)
 #  Bar: y=160, x=4 to x=308
 
 esphome:
@@ -1055,19 +1055,19 @@ lvgl:
                   id: lbl_sec_digits
                   text: "00"
                   text_font: font_seg_sm
-                  x: 262
+                  x: 267
                   y: 67
                   text_color: 0x152E6E
                   bg_opa: 0%
 
               # ══════════════════════════════════════════════════════════════
-              #  ARC GAUGE  (seconds, x=253 y=52, 58×58) — highest z-order:
+              #  ARC GAUGE  (seconds, x=258 y=52, 58×58) — highest z-order:
               #  ring draws LAST so it composites over the static-background
               #  label area; AA pixels blend against bg_color, never text.
               # ══════════════════════════════════════════════════════════════
               - arc:
                   id: sec_arc
-                  x: 253
+                  x: 258
                   y: 52
                   width: 58
                   height: 58
@@ -1093,7 +1093,7 @@ lvgl:
                   id: lbl_ampm
                   text: "AM"
                   text_font: font_s
-                  x: 258
+                  x: 263
                   y: 118
                   text_color: 0x5C7AB8
 
