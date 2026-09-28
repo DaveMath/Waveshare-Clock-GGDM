@@ -389,21 +389,21 @@ static esp_err_t h_settings_page(httpd_req_t* req) {
     httpd_resp_send_chunk(req, PROV_COMMON_CSS, sizeof(PROV_COMMON_CSS)-1);
     static const char SETTINGS_BODY[] = R"html(</style></head><body>
 <div class="card">
-  <h1>⚙ Clock Settings</h1>
-  <p class="sub">Changes apply instantly — no restart needed.</p>
+  <h1>&#9881; Clock Settings</h1>
+  <p class="sub">Changes apply instantly &mdash; no restart needed.</p>
 
   <h2>Color Theme</h2>
   <div class="theme-grid" id="themes">
-    <div class="theme-btn" id="t0" style="background:#EDE8DB;color:#0A246E" onclick="setTheme(0)">Primary</div>
-    <div class="theme-btn" id="t1" style="background:#FDE8F2;color:#CC1270" onclick="setTheme(1)">Pastel</div>
-    <div class="theme-btn" id="t2" style="background:#050A05;color:#00FF41" onclick="setTheme(2)">Neon</div>
-    <div class="theme-btn" id="t3" style="background:#F4F4F4;color:#181818" onclick="setTheme(3)">Neutral</div>
-    <div class="theme-btn" id="t4" style="background:#FFF6E8;color:#B84000" onclick="setTheme(4)">Warm</div>
-    <div class="theme-btn" id="t5" style="background:#E0F0FC;color:#0060B0" onclick="setTheme(5)">Cool</div>
+    <div class="theme-btn" id="t0" onclick="setTheme(0)">Primary</div>
+    <div class="theme-btn" id="t1" onclick="setTheme(1)">Pastel</div>
+    <div class="theme-btn" id="t2" onclick="setTheme(2)">Neon</div>
+    <div class="theme-btn" id="t3" onclick="setTheme(3)">Neutral</div>
+    <div class="theme-btn" id="t4" onclick="setTheme(4)">Warm</div>
+    <div class="theme-btn" id="t5" onclick="setTheme(5)">Cool</div>
   </div>
 
   <h2>Night Mode</h2>
-  <label><input type="radio" name="night" value="0"> Auto (dark 20:00–06:00)</label>
+  <label><input type="radio" name="night" value="0"> Auto (dark 20:00&ndash;06:00)</label>
   <label><input type="radio" name="night" value="1"> Always Day</label>
   <label><input type="radio" name="night" value="2"> Always Night</label>
 
@@ -430,25 +430,57 @@ static esp_err_t h_settings_page(httpd_req_t* req) {
 </div>
 
 <div class="card">
-  <h2>WiFi</h2>
-  <p style="font-size:.88rem;color:#5C7AB8;margin-bottom:10px">Change the network this clock connects to.</p>
-  <a href="/setup" class="btn btn-outline btn-sm">Reconfigure WiFi</a>
+  <h2>WiFi Credentials</h2>
+  <p style="font-size:.88rem;color:#5C7AB8;margin-bottom:10px">Enter new credentials and tap Save &amp; Reconnect. The clock will restart.</p>
+  <h2>Network Name (SSID)</h2>
+  <input id="w_ssid" type="text" placeholder="Your WiFi network name" autocomplete="off">
+  <h2>Password</h2>
+  <input id="w_pass" type="password" placeholder="Leave blank for open networks">
+  <button class="btn save-btn btn-outline" onclick="saveWifi()" style="margin-top:12px">Save &amp; Reconnect</button>
+  <div class="msg" id="wmsg"></div>
 </div>
 
 <script>
+// Theme palettes [dayBg, dayFg, nightBg, nightFg]
+const PALETTES=[
+  ['#EDE8DB','#0A246E','#06080E','#5CAAFF'],
+  ['#FDE8F2','#CC1270','#140410','#FF40B8'],
+  ['#050A05','#00FF41','#020408','#00FFFF'],
+  ['#F4F4F4','#181818','#0E0E0E','#EAEAEA'],
+  ['#FFF6E8','#B84000','#130700','#FF8A00'],
+  ['#E0F0FC','#0060B0','#02090F','#00D0FF'],
+];
 let cur={theme:0,h24:false,tz:0,night:0};
+
+function applyPalettes(){
+  const h=new Date().getHours();
+  const day=cur.night===1?true:cur.night===2?false:(h>=6&&h<20);
+  document.querySelectorAll('.theme-btn').forEach((b,i)=>{
+    const p=PALETTES[i];
+    b.style.background=day?p[0]:p[2];
+    b.style.color=day?p[1]:p[3];
+  });
+}
+
 fetch('/api/settings').then(r=>r.json()).then(s=>{
   cur=s;
+  applyPalettes();
   setThemeHighlight(s.theme);
   document.querySelectorAll('input[name=night]').forEach(r=>{ if(r.value==s.night) r.checked=true; });
   document.querySelectorAll('input[name=fmt]').forEach(r=>{ if(r.value==String(s.h24)) r.checked=true; });
   document.getElementById('tz').value=s.tz;
 });
+
+document.querySelectorAll('input[name=night]').forEach(r=>{
+  r.addEventListener('change',()=>{ cur.night=parseInt(r.value); applyPalettes(); });
+});
+
 function setThemeHighlight(i){
   document.querySelectorAll('.theme-btn').forEach((b,idx)=>b.classList.toggle('selected',idx===i));
   cur.theme=i;
 }
 function setTheme(i){ setThemeHighlight(i); }
+
 function saveSettings(){
   const night=parseInt(document.querySelector('input[name=night]:checked')?.value??cur.night);
   const h24=document.querySelector('input[name=fmt]:checked')?.value==='true';
@@ -458,10 +490,28 @@ function saveSettings(){
     .then(r=>r.json()).then(j=>{
       const m=document.getElementById('msg');
       m.className='msg '+(j.ok?'ok':'err');
-      m.textContent=j.ok?'✓ Settings applied to clock!':'✗ Save failed';
+      m.textContent=j.ok?'&#10003; Settings applied!':'&#10007; Save failed';
     }).catch(()=>{
-      const m=document.getElementById('msg');
-      m.className='msg err'; m.textContent='✗ Request failed';
+      document.getElementById('msg').className='msg err';
+      document.getElementById('msg').textContent='&#10007; Request failed';
+    });
+}
+
+function saveWifi(){
+  const ssid=document.getElementById('w_ssid').value.trim();
+  if(!ssid){
+    const m=document.getElementById('wmsg');
+    m.className='msg err'; m.textContent='&#10007; Please enter a network name.'; return;
+  }
+  fetch('/save',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({ssid,pass:document.getElementById('w_pass').value,tz:String(cur.tz)})})
+    .then(r=>r.json()).then(j=>{
+      const m=document.getElementById('wmsg');
+      m.className='msg '+(j.ok?'ok':'err');
+      m.textContent=j.ok?'&#10003; Saved! Restarting…':'&#10007; '+j.msg;
+    }).catch(()=>{
+      document.getElementById('wmsg').className='msg err';
+      document.getElementById('wmsg').textContent='&#10007; Request failed';
     });
 }
 </script>)html";

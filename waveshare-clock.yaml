@@ -113,12 +113,10 @@ globals:
     initial_value: '0'
 
 api:
-  encryption:
-    key: !secret api_key
 
 ota:
   - platform: esphome
-    password: !secret ota_password
+    password: ""
 
 wifi:
   ap:
@@ -271,15 +269,19 @@ interval:
           s_sync_err_start = 0;
           int h = t.hour, m = t.minute, s = t.second;
 
-          // Day/night (auto or forced)
-          bool want_day = g_night_auto ? (h >= 6 && h < 20) : g_is_day;
-          if (want_day != g_is_day) {
-            g_is_day = want_day;
-            apply_current_theme(
-              id(clock_screen), id(date_header),
-              id(lbl_date), id(lbl_ampm),
-              id(sec_bar_bg), id(sec_bar_fg),
-              id(sec_arc), id(lbl_sec_digits));
+          // Day/night: only at first sync and at exact 6:00:00 / 20:00:00
+          static bool s_daynight_init = false;
+          if (!s_daynight_init || (m == 0 && s == 0 && (h == 6 || h == 20))) {
+            s_daynight_init = true;
+            bool want_day = g_night_auto ? (h >= 6 && h < 20) : g_is_day;
+            if (want_day != g_is_day) {
+              g_is_day = want_day;
+              apply_current_theme(
+                id(clock_screen), id(date_header),
+                id(lbl_date), id(lbl_ampm),
+                id(sec_bar_bg), id(sec_bar_fg),
+                id(sec_arc), id(lbl_sec_digits));
+            }
           }
 
           // Hide toast after 2.5 s
