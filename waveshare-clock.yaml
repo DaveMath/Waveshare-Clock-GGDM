@@ -117,7 +117,7 @@ ota:
 
 wifi:
   ap:
-    ssid: "WaveShare-Clock"
+    ssid: "Waveshare-Clock"
     password: ""
   reboot_timeout: 0s
   on_connect:
@@ -1168,7 +1168,7 @@ lvgl:
 
     # ══════════════════════════════════════════════════════════════════════════
     #  SETUP PAGE  –  shown on first boot when no WiFi credentials are stored
-    #  Left: QR code (scan to auto-join WaveShare-Clock AP)
+    #  Left: QR code (scan to auto-join Waveshare-Clock AP)
     #  Right: step-by-step instructions
     # ══════════════════════════════════════════════════════════════════════════
     - id: setup_page
@@ -1232,7 +1232,7 @@ lvgl:
                   y: 29
                   text_color: 0x8AAED4
               - label:
-                  text: "WaveShare-Clock"
+                  text: "Waveshare-Clock"
                   text_font: font_m
                   x: 101
                   y: 42

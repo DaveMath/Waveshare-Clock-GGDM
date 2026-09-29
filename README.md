@@ -76,7 +76,7 @@ Auto day/night switches at 06:00 and 20:00. Override available via web settings.
 10 US/global zones, cycle with the button. Current zone is always shown in the date bar — no digging into menus to remember what you set.
 
 ### Connectivity
-- **Captive-portal setup** — connect to `Clock-By-GGDM` AP, open `http://1.2.3.4`, done
+- **Captive-portal setup** — connect to `Waveshare-Clock` AP, open `http://1.2.3.4`, done
 - **Always-on settings page** — accessible while the clock is running, no restart required
 - **APSTA mode** — the provisioning AP stays up while the clock is connected to your home network
 - Credentials and settings stored in ESP-IDF NVS; survive OTA updates
@@ -107,7 +107,7 @@ The button also recovers the backlight if it dims. No dedicated brightness contr
 
 ## Web Settings
 
-Reconnect to **`Clock-By-GGDM`** and visit `http://1.2.3.4`:
+Reconnect to **`Waveshare-Clock`** and visit `http://1.2.3.4`:
 
 - Choose **color theme**
 - Set **Night Mode** — Auto / Always Day / Always Night

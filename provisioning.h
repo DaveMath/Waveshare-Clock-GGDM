@@ -1,6 +1,6 @@
 #pragma once
 // ── WiFi Provisioning + Settings Server ──────────────────────────────────────
-// First boot (no stored WiFi): AP "WaveShare-Clock" at 1.2.3.4, captive DNS,
+// First boot (no stored WiFi): AP "Waveshare-Clock" at 1.2.3.4, captive DNS,
 // setup web page to enter SSID/password/timezone.
 // Clock mode: same AP stays up at 1.2.3.4, serves settings page so the user
 // can change theme, time format, timezone, and night mode at any time.
@@ -21,7 +21,7 @@
 // clock_helper.h must be included before this file (TZ_NAMES, NUM_TZ, etc.)
 
 #define PROV_NVS_NS  "clk"
-#define PROV_AP_SSID "WaveShare-Clock"
+#define PROV_AP_SSID "Waveshare-Clock"
 
 bool g_provisioning = false;
 volatile int g_settings_changed = 0;  // set by web handler task; checked in main task
@@ -142,17 +142,30 @@ static void prov_dns_task(void*) {
 // Pre-populated to valid JSON so /scan always returns something
 static char prov_scan_json[2048] = "[]";
 
-// Assumes WiFi already in APSTA mode — no mode switching
 static void prov_do_scan() {
+    // Scanning requires STA interface — switch to APSTA if needed
+    wifi_mode_t mode = WIFI_MODE_NULL;
+    esp_wifi_get_mode(&mode);
+    if (mode == WIFI_MODE_AP) {
+        esp_wifi_set_mode(WIFI_MODE_APSTA);
+        vTaskDelay(pdMS_TO_TICKS(500));
+    }
     wifi_scan_config_t cfg = {};
     cfg.scan_type = WIFI_SCAN_TYPE_ACTIVE;
     cfg.scan_time.active.min = 100;
-    cfg.scan_time.active.max = 300;
-    if (esp_wifi_scan_start(&cfg, true) != ESP_OK) return;
+    cfg.scan_time.active.max = 400;
+    // Retry up to 3 times — driver may not be settled on first attempt
+    esp_err_t err = ESP_FAIL;
+    for (int i = 0; i < 3 && err != ESP_OK; i++) {
+        if (i) vTaskDelay(pdMS_TO_TICKS(1000));
+        err = esp_wifi_scan_start(&cfg, true);
+    }
+    if (err != ESP_OK) return;
     uint16_t cnt = 20;
     static wifi_ap_record_t recs[20];
     esp_wifi_scan_get_ap_num(&cnt);
     if (cnt > 20) cnt = 20;
+    if (cnt == 0) return;  // keep previous good results
     esp_wifi_scan_get_ap_records(&cnt, recs);
     int pos = snprintf(prov_scan_json, sizeof(prov_scan_json), "[");
     for (int i = 0; i < cnt; i++) {
@@ -171,11 +184,12 @@ static void prov_do_scan() {
     snprintf(prov_scan_json+pos, sizeof(prov_scan_json)-pos, "]");
 }
 
-// Re-scans every 30 s in background; results cached in prov_scan_json
+// Scans at 5 s (quick first result) then every 30 s; results cached in prov_scan_json
 static void prov_scan_task(void*) {
+    vTaskDelay(pdMS_TO_TICKS(5000));
     for (;;) {
-        vTaskDelay(pdMS_TO_TICKS(30000));
         prov_do_scan();
+        vTaskDelay(pdMS_TO_TICKS(30000));
     }
 }
 
@@ -244,16 +258,16 @@ footer a{color:#2E5499;text-decoration:none}
 
 static const char SETUP_HTML[] = R"html(<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Clock Setup — Clock-By-GGDM</title><style>)html";
+<title>Clock Setup — Waveshare-Clock</title><style>)html";
 
 static const char SETTINGS_HTML[] = R"html(<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Clock Settings — Clock-By-GGDM</title><style>)html";
+<title>Clock Settings — Waveshare-Clock</title><style>)html";
 
 // Shared footer
 static const char HTML_FOOTER[] = R"html(
 <footer>
-  <p>Clock-By-GGDM &nbsp;|&nbsp; <a href="https://x.com/ggdm" target="_blank">@ggdm on X</a>
+  <p>Waveshare-Clock &nbsp;|&nbsp; <a href="https://x.com/ggdm" target="_blank">@ggdm on X</a>
   &nbsp;|&nbsp; <a href="https://github.com/DaveMath/Waveshare-Clock-GGDM" target="_blank">GitHub</a></p>
 </footer>
 </body></html>)html";
@@ -322,7 +336,7 @@ static esp_err_t h_setup_page(httpd_req_t* req) {
     static const char SETUP_BODY[] = R"html(</style></head><body>
 <div class="card">
   <h1>⏰ Clock Setup</h1>
-  <p class="sub">Connect your WiFi — WaveShare-Clock</p>
+  <p class="sub">Connect your WiFi — Waveshare-Clock</p>
   <h2>Available Networks</h2>
   <ul class="net-list" id="nets"><li style="padding:10px;color:#8899BB">Scanning…</li></ul>
   <h2>Network Name (SSID)</h2>
@@ -565,10 +579,9 @@ static void _start_httpd(bool captive) {
 // Call from on_boot when provisioning is needed
 inline void prov_start() {
     g_provisioning = true;
-    esp_wifi_set_mode(WIFI_MODE_APSTA);   // stay APSTA throughout provisioning
-    vTaskDelay(pdMS_TO_TICKS(500));       // let STA interface init
+    esp_wifi_set_mode(WIFI_MODE_APSTA);   // STA interface needed for scanning
+    vTaskDelay(pdMS_TO_TICKS(500));
     prov_set_ap_ip();
-    prov_do_scan();                        // pre-scan before HTTP starts so /scan is ready
     xTaskCreate(prov_dns_task,   "prov_dns",  4096, NULL, 5, NULL);
     xTaskCreate(prov_scan_task,  "prov_scan", 4096, NULL, 4, NULL);
     _start_httpd(true);
