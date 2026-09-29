@@ -304,8 +304,8 @@ static const char* TZ_LABELS[] = {
     "Tokyo (JST)",     "Sydney (AEST)",
     "Atlantic (AT)",   "Brazil (BRT)",    "Argentina (ART)", "Helsinki (EET)",
     "Moscow (MSK)",    "Dubai (GST)",     "Tehran (IRST)",   "Pakistan (PKT)",
-    "India (IST)",     "Dhaka (+06)",     "Bangkok (ICT)",   "Singapore (SGT)",
-    "Beijing (+08)",   "Seoul (KST)",     "Adelaide (ACST)", "Auckland (NZST)",
+    "India (IST)",     "Dhaka (BDT)",     "Bangkok (ICT)",   "Singapore (SGT)",
+    "China (CST)",     "Seoul (KST)",     "Adelaide (ACST)", "Auckland (NZST)",
 };
 static const char* TZ_NAMES[] = {
     "America/Los_Angeles",   "America/Denver",          "America/Chicago",

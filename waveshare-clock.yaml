@@ -147,12 +147,12 @@ font:
   - file: "gfonts://Roboto"
     id: font_m
     size: 13
-    glyphs: "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz :./-(),"
+    glyphs: "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz :./-(),+"
 
   - file: "gfonts://Roboto"
     id: font_s
     size: 11
-    glyphs: "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz :./-(),"
+    glyphs: "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz :./-(),+"
 
 spi:
   clk_pin:  GPIO40
