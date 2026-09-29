@@ -142,8 +142,9 @@ static void prov_dns_task(void*) {
 // Pre-populated to valid JSON so /scan always returns something
 static char prov_scan_json[2048] = "[]";
 
-static void prov_do_scan() {
-    // Scanning requires STA interface — switch to APSTA if needed
+// quick=true: single attempt (~400 ms) for on-demand button press
+// quick=false: up to 3 retries for background task
+static void prov_do_scan(bool quick = false) {
     wifi_mode_t mode = WIFI_MODE_NULL;
     esp_wifi_get_mode(&mode);
     if (mode == WIFI_MODE_AP) {
@@ -154,9 +155,9 @@ static void prov_do_scan() {
     cfg.scan_type = WIFI_SCAN_TYPE_ACTIVE;
     cfg.scan_time.active.min = 100;
     cfg.scan_time.active.max = 400;
-    // Retry up to 3 times — driver may not be settled on first attempt
+    int max_tries = quick ? 1 : 3;
     esp_err_t err = ESP_FAIL;
-    for (int i = 0; i < 3 && err != ESP_OK; i++) {
+    for (int i = 0; i < max_tries && err != ESP_OK; i++) {
         if (i) vTaskDelay(pdMS_TO_TICKS(1000));
         err = esp_wifi_scan_start(&cfg, true);
     }
@@ -248,6 +249,7 @@ input[type=radio]{accent-color:#2E5499;width:16px;height:16px}
 .net-list li{padding:8px 11px;cursor:pointer;font-size:.88rem;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #EDE8DB}
 .net-list li:last-child{border-bottom:none}
 .net-list li:hover{background:#EDE8DB}
+.net-list li.selected{background:#D0E4F8;font-weight:600}
 .bars{color:#5C7AB8;font-size:.78rem}
 footer{text-align:center;font-size:.78rem;color:#8899BB;margin-top:8px;padding-bottom:8px}
 footer a{color:#2E5499;text-decoration:none}
@@ -275,6 +277,7 @@ static const char HTML_FOOTER[] = R"html(
 // ── HTTP Handlers ─────────────────────────────────────────────────────────────
 
 static esp_err_t h_scan(httpd_req_t* req) {
+    prov_do_scan(true);  // fresh single-attempt scan on each button press
     httpd_resp_set_type(req, "application/json");
     httpd_resp_sendstr(req, prov_scan_json);
     return ESP_OK;
@@ -335,14 +338,21 @@ static esp_err_t h_setup_page(httpd_req_t* req) {
     httpd_resp_send_chunk(req, PROV_COMMON_CSS, sizeof(PROV_COMMON_CSS)-1);
     static const char SETUP_BODY[] = R"html(</style></head><body>
 <div class="card">
-  <h1>⏰ Clock Setup</h1>
-  <p class="sub">Connect your WiFi — Waveshare-Clock</p>
-  <h2>Available Networks</h2>
-  <ul class="net-list" id="nets"><li style="padding:10px;color:#8899BB">Scanning…</li></ul>
+  <h1>&#9200; Clock Setup</h1>
+  <p class="sub">Connect your WiFi &mdash; Waveshare-Clock</p>
+
   <h2>Network Name (SSID)</h2>
-  <input id="ssid" type="text" placeholder="Select above or type here" autocomplete="off">
+  <input id="ssid" type="text" placeholder="Type your network name here" autocomplete="off">
+
   <h2>Password</h2>
   <input id="pass" type="password" placeholder="Leave blank for open networks">
+
+  <div style="display:flex;gap:8px;align-items:center;margin-top:12px">
+    <button class="btn" id="scan-btn" onclick="doScan()" style="flex:0 0 auto;padding:10px 18px;font-size:.9rem">Scan Networks</button>
+    <span id="scan-status" style="font-size:.85rem;color:#8899BB"></span>
+  </div>
+  <ul class="net-list" id="nets" style="margin-top:8px"></ul>
+
   <h2>Timezone</h2>
   <select id="tz">
     <option value="0">Pacific (PT)</option>
@@ -356,22 +366,31 @@ static esp_err_t h_setup_page(httpd_req_t* req) {
     <option value="8">Tokyo (JST)</option>
     <option value="9">Sydney (AEST)</option>
   </select>
-  <button class="btn save-btn" id="btn" onclick="save()">Save &amp; Connect</button>
+
+  <button class="btn save-btn" id="btn" onclick="save()" style="margin-top:18px">Save &amp; Connect</button>
   <div class="msg" id="msg"></div>
 </div>
 <script>
 function bars(r){return r>-55?'▂▄▆█':r>-70?'▂▄▆':r>-85?'▂▄':'▂'}
-fetch('/scan').then(r=>r.json()).then(nets=>{
-  const ul=document.getElementById('nets');
-  if(!nets.length){ul.innerHTML='<li style="padding:10px;color:#8899BB">No networks found</li>';return}
-  ul.innerHTML='';
-  nets.forEach(n=>{
-    const li=document.createElement('li');
-    li.innerHTML='<span>'+(n.open?'':'🔒 ')+n.ssid+'</span><span class="bars">'+bars(n.rssi)+'</span>';
-    li.onclick=()=>document.getElementById('ssid').value=n.ssid;
-    ul.appendChild(li);
-  });
-}).catch(()=>{document.getElementById('nets').innerHTML='<li style="padding:10px">Scan unavailable</li>';});
+function doScan(){
+  const sb=document.getElementById('scan-btn');
+  const st=document.getElementById('scan-status');
+  sb.disabled=true; st.textContent='Scanning…';
+  fetch('/scan').then(r=>r.json()).then(nets=>{
+    sb.disabled=false; st.textContent=nets.length?nets.length+' network'+(nets.length===1?'':'s')+' found':'No networks found';
+    const ul=document.getElementById('nets');
+    if(!nets.length){ul.innerHTML='';return}
+    ul.innerHTML='';
+    nets.forEach(n=>{
+      const li=document.createElement('li');
+      li.innerHTML='<span>'+(n.open?'':'&#128274; ')+n.ssid+'</span><span class="bars">'+bars(n.rssi)+'</span>';
+      li.onclick=()=>{ document.getElementById('ssid').value=n.ssid;
+        ul.querySelectorAll('li').forEach(x=>x.classList.remove('selected'));
+        li.classList.add('selected'); };
+      ul.appendChild(li);
+    });
+  }).catch(()=>{sb.disabled=false;st.textContent='Scan failed — type your network name above';});
+}
 function save(){
   const ssid=document.getElementById('ssid').value.trim();
   if(!ssid){showMsg('err','Please enter a network name.');return}
@@ -380,9 +399,9 @@ function save(){
   btn.disabled=true; btn.textContent='Saving…';
   fetch('/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)})
     .then(r=>r.json()).then(j=>{
-      if(j.ok){showMsg('ok','✓ Saved! Clock is restarting…'); btn.textContent='Done';}
-      else{showMsg('err','✗ '+j.msg); btn.disabled=false; btn.textContent='Save & Connect';}
-    }).catch(()=>{showMsg('err','✗ Request failed.'); btn.disabled=false; btn.textContent='Save & Connect';});
+      if(j.ok){showMsg('ok','&#10003; Saved! Clock is restarting…'); btn.textContent='Done';}
+      else{showMsg('err','&#10007; '+j.msg); btn.disabled=false; btn.textContent='Save & Connect';}
+    }).catch(()=>{showMsg('err','&#10007; Request failed.'); btn.disabled=false; btn.textContent='Save & Connect';});
 }
 function showMsg(cls,txt){const m=document.getElementById('msg');m.className='msg '+cls;m.textContent=txt;}
 </script>)html";
@@ -440,13 +459,22 @@ static esp_err_t h_settings_page(httpd_req_t* req) {
 </div>
 
 <div class="card">
-  <h2>WiFi Credentials</h2>
-  <p style="font-size:.88rem;color:#5C7AB8;margin-bottom:10px">Enter new credentials and tap Save &amp; Reconnect. The clock will restart.</p>
+  <h1>&#128246; WiFi</h1>
+  <p class="sub">Enter new credentials and tap Save &amp; Reconnect &mdash; clock will restart.</p>
+
   <h2>Network Name (SSID)</h2>
-  <input id="w_ssid" type="text" placeholder="Your WiFi network name" autocomplete="off">
+  <input id="w_ssid" type="text" placeholder="Type your network name here" autocomplete="off">
+
   <h2>Password</h2>
   <input id="w_pass" type="password" placeholder="Leave blank for open networks">
-  <button class="btn save-btn btn-outline" onclick="saveWifi()" style="margin-top:12px">Save &amp; Reconnect</button>
+
+  <div style="display:flex;gap:8px;align-items:center;margin-top:12px">
+    <button class="btn" id="w_scan_btn" onclick="doWifiScan()" style="flex:0 0 auto;padding:10px 18px;font-size:.9rem">Scan Networks</button>
+    <span id="w_scan_status" style="font-size:.85rem;color:#8899BB"></span>
+  </div>
+  <ul class="net-list" id="w_nets" style="margin-top:8px"></ul>
+
+  <button class="btn save-btn btn-outline" onclick="saveWifi()" style="margin-top:14px">Save &amp; Reconnect</button>
   <div class="msg" id="wmsg"></div>
 </div>
 
@@ -489,7 +517,17 @@ function setThemeHighlight(i){
   document.querySelectorAll('.theme-btn').forEach((b,idx)=>b.classList.toggle('selected',idx===i));
   cur.theme=i;
 }
-function setTheme(i){ setThemeHighlight(i); }
+function setTheme(i){
+  setThemeHighlight(i);
+  fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({theme:i})})
+    .then(r=>r.json()).then(j=>{
+      const m=document.getElementById('msg');
+      m.className='msg '+(j.ok?'ok':'err');
+      m.textContent=j.ok?'&#10003; Theme applied!':'&#10007; Apply failed';
+      if(j.ok) setTimeout(()=>m.textContent='',2000);
+    }).catch(()=>{});
+}
 
 function saveSettings(){
   const night=parseInt(document.querySelector('input[name=night]:checked')?.value??cur.night);
@@ -505,6 +543,26 @@ function saveSettings(){
       document.getElementById('msg').className='msg err';
       document.getElementById('msg').textContent='&#10007; Request failed';
     });
+}
+
+function bars(r){return r>-55?'▂▄▆█':r>-70?'▂▄▆':r>-85?'▂▄':'▂'}
+function doWifiScan(){
+  const sb=document.getElementById('w_scan_btn');
+  const st=document.getElementById('w_scan_status');
+  sb.disabled=true; st.textContent='Scanning…';
+  fetch('/scan').then(r=>r.json()).then(nets=>{
+    sb.disabled=false; st.textContent=nets.length?nets.length+' network'+(nets.length===1?'':'s')+' found':'No networks found';
+    const ul=document.getElementById('w_nets');
+    ul.innerHTML='';
+    nets.forEach(n=>{
+      const li=document.createElement('li');
+      li.innerHTML='<span>'+(n.open?'':'&#128274; ')+n.ssid+'</span><span class="bars">'+bars(n.rssi)+'</span>';
+      li.onclick=()=>{ document.getElementById('w_ssid').value=n.ssid;
+        ul.querySelectorAll('li').forEach(x=>x.classList.remove('selected'));
+        li.classList.add('selected'); };
+      ul.appendChild(li);
+    });
+  }).catch(()=>{sb.disabled=false;st.textContent='Scan failed — type your network name above';});
 }
 
 function saveWifi(){
@@ -592,6 +650,7 @@ inline void settings_start() {
     g_provisioning = false;
     vTaskDelay(pdMS_TO_TICKS(200));
     prov_set_ap_ip();
-    xTaskCreate(prov_dns_task, "settings_dns", 4096, NULL, 5, NULL);
+    xTaskCreate(prov_dns_task,  "settings_dns",  4096, NULL, 5, NULL);
+    xTaskCreate(prov_scan_task, "settings_scan", 4096, NULL, 4, NULL);
     _start_httpd(false);
 }
