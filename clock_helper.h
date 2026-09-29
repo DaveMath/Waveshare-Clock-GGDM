@@ -1,7 +1,7 @@
 #pragma once
 #include "lvgl.h"
 
-#define CLOCK_VERSION "1.3"
+#define CLOCK_VERSION "1.4"
 
 // ── 7-Segment rectangles with per-segment slide animation ────────────────────
 // bit0=A(top) bit1=B(top-R) bit2=C(bot-R) bit3=D(bot) bit4=E(bot-L)
