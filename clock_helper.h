@@ -1,7 +1,7 @@
 #pragma once
 #include "lvgl.h"
 
-#define CLOCK_VERSION "1.2"
+#define CLOCK_VERSION "1.3"
 
 // ── 7-Segment rectangles with per-segment slide animation ────────────────────
 // bit0=A(top) bit1=B(top-R) bit2=C(bot-R) bit3=D(bot) bit4=E(bot-L)
@@ -262,29 +262,63 @@ static const ThemePair* const THEME_PAIRS[] = {
 // ── Timezones ─────────────────────────────────────────────────────────────────
 
 static const char* TZ_POSIX[] = {
-    "PST8PDT,M3.2.0,M11.1.0",            // Pacific
-    "MST7MDT,M3.2.0,M11.1.0",            // Mountain
-    "CST6CDT,M3.2.0,M11.1.0",            // Central
-    "EST5EDT,M3.2.0,M11.1.0",            // Eastern
-    "AKST9AKDT,M3.2.0,M11.1.0",          // Alaska
-    "HST10",                              // Hawaii (no DST)
-    "GMT0BST,M3.5.0/1,M10.5.0",          // London
-    "CET-1CEST,M3.5.0,M10.5.0/3",        // Paris / Berlin
-    "JST-9",                              // Tokyo (no DST)
-    "AEST-10AEDT,M10.1.0,M4.1.0/3",      // Sydney
+    // ── Americas ────────────────────────────────────────────────────────────
+    "PST8PDT,M3.2.0,M11.1.0",            //  0 Pacific
+    "MST7MDT,M3.2.0,M11.1.0",            //  1 Mountain
+    "CST6CDT,M3.2.0,M11.1.0",            //  2 Central
+    "EST5EDT,M3.2.0,M11.1.0",            //  3 Eastern
+    "AKST9AKDT,M3.2.0,M11.1.0",          //  4 Alaska
+    "HST10",                              //  5 Hawaii (no DST)
+    // ── Europe ──────────────────────────────────────────────────────────────
+    "GMT0BST,M3.5.0/1,M10.5.0",          //  6 London
+    "CET-1CEST,M3.5.0,M10.5.0/3",        //  7 Paris / Berlin
+    // ── Asia / Pacific ──────────────────────────────────────────────────────
+    "JST-9",                              //  8 Tokyo (no DST)
+    "AEST-10AEDT,M10.1.0,M4.1.0/3",      //  9 Sydney
+    // ── Extended Americas ───────────────────────────────────────────────────
+    "AST4ADT,M3.2.0,M11.1.0",            // 10 Atlantic (Canada / Caribbean)
+    "BRT3",                               // 11 Brazil / São Paulo (no DST)
+    "ART3",                               // 12 Argentina (no DST)
+    // ── Extended Europe / Africa ────────────────────────────────────────────
+    "EET-2EEST,M3.5.0/3,M10.5.0/4",      // 13 Helsinki / Athens / Kyiv
+    "MSK-3",                              // 14 Moscow (no DST)
+    // ── Middle East ─────────────────────────────────────────────────────────
+    "GST-4",                              // 15 Dubai / UAE (no DST)
+    "IRST-3:30IRDT,80/0,264/0",           // 16 Tehran — spring day 80, fall day 264
+    // ── South / Central Asia ────────────────────────────────────────────────
+    "PKT-5",                              // 17 Islamabad / Karachi (no DST)
+    "IST-5:30",                           // 18 India (no DST)
+    "<+06>-6",                            // 19 Dhaka / Bangladesh (no DST)
+    // ── Southeast Asia ──────────────────────────────────────────────────────
+    "ICT-7",                              // 20 Bangkok / Hanoi / Jakarta (no DST)
+    "SGT-8",                              // 21 Singapore / Hong Kong (no DST)
+    "<+08>-8",                            // 22 Beijing / Shanghai (no DST)
+    // ── East Asia / Pacific ─────────────────────────────────────────────────
+    "KST-9",                              // 23 Seoul (no DST)
+    "ACST-9:30ACDT,M10.1.0,M4.1.0/3",    // 24 Adelaide
+    "NZST-12NZDT,M9.5.0,M4.1.0/3",       // 25 Auckland / New Zealand
 };
 static const char* TZ_LABELS[] = {
-    "Pacific (PT)", "Mountain (MT)", "Central (CT)", "Eastern (ET)",
-    "Alaska (AKT)", "Hawaii (HST)", "London (GMT)", "Paris (CET)",
-    "Tokyo (JST)",  "Sydney (AEST)",
+    "Pacific (PT)",    "Mountain (MT)",   "Central (CT)",    "Eastern (ET)",
+    "Alaska (AKT)",    "Hawaii (HST)",    "London (GMT)",    "Paris (CET)",
+    "Tokyo (JST)",     "Sydney (AEST)",
+    "Atlantic (AT)",   "Brazil (BRT)",    "Argentina (ART)", "Helsinki (EET)",
+    "Moscow (MSK)",    "Dubai (GST)",     "Tehran (IRST)",   "Pakistan (PKT)",
+    "India (IST)",     "Dhaka (+06)",     "Bangkok (ICT)",   "Singapore (SGT)",
+    "Beijing (+08)",   "Seoul (KST)",     "Adelaide (ACST)", "Auckland (NZST)",
 };
-// NVS timezone string names (for web UI and settings)
 static const char* TZ_NAMES[] = {
-    "America/Los_Angeles", "America/Denver", "America/Chicago", "America/New_York",
-    "America/Anchorage",   "Pacific/Honolulu", "Europe/London", "Europe/Paris",
-    "Asia/Tokyo",          "Australia/Sydney",
+    "America/Los_Angeles",   "America/Denver",          "America/Chicago",
+    "America/New_York",      "America/Anchorage",       "Pacific/Honolulu",
+    "Europe/London",         "Europe/Paris",            "Asia/Tokyo",
+    "Australia/Sydney",      "America/Halifax",         "America/Sao_Paulo",
+    "America/Argentina/Buenos_Aires", "Europe/Helsinki","Europe/Moscow",
+    "Asia/Dubai",            "Asia/Tehran",             "Asia/Karachi",
+    "Asia/Kolkata",          "Asia/Dhaka",              "Asia/Bangkok",
+    "Asia/Singapore",        "Asia/Shanghai",           "Asia/Seoul",
+    "Australia/Adelaide",    "Pacific/Auckland",
 };
-#define NUM_TZ 10
+#define NUM_TZ 26
 
 // ── Runtime globals ───────────────────────────────────────────────────────────
 

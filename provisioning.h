@@ -355,16 +355,42 @@ static esp_err_t h_setup_page(httpd_req_t* req) {
 
   <h2>Timezone</h2>
   <select id="tz">
-    <option value="0">Pacific (PT)</option>
-    <option value="1">Mountain (MT)</option>
-    <option value="2">Central (CT)</option>
-    <option value="3">Eastern (ET)</option>
-    <option value="4">Alaska (AKT)</option>
-    <option value="5">Hawaii (HST)</option>
-    <option value="6">London (GMT/BST)</option>
-    <option value="7">Paris / Berlin (CET)</option>
-    <option value="8">Tokyo (JST)</option>
-    <option value="9">Sydney (AEST)</option>
+    <optgroup label="Americas">
+      <option value="0">Pacific (PT)</option>
+      <option value="1">Mountain (MT)</option>
+      <option value="2">Central (CT)</option>
+      <option value="3">Eastern (ET)</option>
+      <option value="4">Alaska (AKT)</option>
+      <option value="5">Hawaii (HST)</option>
+      <option value="10">Atlantic — Canada (AT)</option>
+      <option value="11">Brazil / Sao Paulo (BRT)</option>
+      <option value="12">Argentina (ART)</option>
+    </optgroup>
+    <optgroup label="Europe">
+      <option value="6">London (GMT/BST)</option>
+      <option value="7">Paris / Berlin (CET)</option>
+      <option value="13">Helsinki / Athens (EET)</option>
+      <option value="14">Moscow (MSK)</option>
+    </optgroup>
+    <optgroup label="Middle East">
+      <option value="15">Dubai / UAE (GST)</option>
+      <option value="16">Tehran / Iran (IRST)</option>
+    </optgroup>
+    <optgroup label="Asia">
+      <option value="17">Islamabad / Karachi (PKT)</option>
+      <option value="18">India (IST)</option>
+      <option value="19">Dhaka / Bangladesh (+06)</option>
+      <option value="20">Bangkok / Hanoi (ICT)</option>
+      <option value="21">Singapore / Hong Kong (SGT)</option>
+      <option value="22">Beijing / Shanghai (+08)</option>
+      <option value="8">Tokyo (JST)</option>
+      <option value="23">Seoul (KST)</option>
+    </optgroup>
+    <optgroup label="Pacific">
+      <option value="24">Adelaide (ACST)</option>
+      <option value="9">Sydney (AEST)</option>
+      <option value="25">Auckland / NZ (NZST)</option>
+    </optgroup>
   </select>
 
   <button class="btn save-btn" id="btn" onclick="save()" style="margin-top:18px">Save &amp; Connect</button>
@@ -442,16 +468,42 @@ static esp_err_t h_settings_page(httpd_req_t* req) {
 
   <h2>Timezone</h2>
   <select id="tz">
-    <option value="0">Pacific (PT)</option>
-    <option value="1">Mountain (MT)</option>
-    <option value="2">Central (CT)</option>
-    <option value="3">Eastern (ET)</option>
-    <option value="4">Alaska (AKT)</option>
-    <option value="5">Hawaii (HST)</option>
-    <option value="6">London (GMT/BST)</option>
-    <option value="7">Paris / Berlin (CET)</option>
-    <option value="8">Tokyo (JST)</option>
-    <option value="9">Sydney (AEST)</option>
+    <optgroup label="Americas">
+      <option value="0">Pacific (PT)</option>
+      <option value="1">Mountain (MT)</option>
+      <option value="2">Central (CT)</option>
+      <option value="3">Eastern (ET)</option>
+      <option value="4">Alaska (AKT)</option>
+      <option value="5">Hawaii (HST)</option>
+      <option value="10">Atlantic — Canada (AT)</option>
+      <option value="11">Brazil / Sao Paulo (BRT)</option>
+      <option value="12">Argentina (ART)</option>
+    </optgroup>
+    <optgroup label="Europe">
+      <option value="6">London (GMT/BST)</option>
+      <option value="7">Paris / Berlin (CET)</option>
+      <option value="13">Helsinki / Athens (EET)</option>
+      <option value="14">Moscow (MSK)</option>
+    </optgroup>
+    <optgroup label="Middle East">
+      <option value="15">Dubai / UAE (GST)</option>
+      <option value="16">Tehran / Iran (IRST)</option>
+    </optgroup>
+    <optgroup label="Asia">
+      <option value="17">Islamabad / Karachi (PKT)</option>
+      <option value="18">India (IST)</option>
+      <option value="19">Dhaka / Bangladesh (+06)</option>
+      <option value="20">Bangkok / Hanoi (ICT)</option>
+      <option value="21">Singapore / Hong Kong (SGT)</option>
+      <option value="22">Beijing / Shanghai (+08)</option>
+      <option value="8">Tokyo (JST)</option>
+      <option value="23">Seoul (KST)</option>
+    </optgroup>
+    <optgroup label="Pacific">
+      <option value="24">Adelaide (ACST)</option>
+      <option value="9">Sydney (AEST)</option>
+      <option value="25">Auckland / NZ (NZST)</option>
+    </optgroup>
   </select>
 
   <button class="btn save-btn" onclick="saveSettings()">Apply Settings</button>

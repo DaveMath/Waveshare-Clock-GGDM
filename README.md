@@ -73,7 +73,15 @@ Six palettes, each with a day and night variant:
 Auto day/night switches at 06:00 and 20:00. Override available via web settings.
 
 ### Timezones
-10 US/global zones, cycle with the button. Current zone is always shown in the date bar — no digging into menus to remember what you set.
+26 zones covering every major UTC offset worldwide, cycle with the button or pick from the grouped web dropdown. Current zone is always shown in the date bar — no digging into menus to remember what you set.
+
+| Region | Zones |
+|--------|-------|
+| Americas | Pacific, Mountain, Central, Eastern, Alaska, Hawaii, Atlantic, Brazil, Argentina |
+| Europe | London, Paris/Berlin, Helsinki/Athens, Moscow |
+| Middle East | Dubai, Tehran |
+| Asia | Pakistan, India, Bangladesh, Bangkok, Singapore, Beijing, Tokyo, Seoul |
+| Pacific | Adelaide, Sydney, Auckland |
 
 ### Connectivity
 - **Captive-portal setup** — connect to `Waveshare-Clock` AP, open `http://1.2.3.4`, done
